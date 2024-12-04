@@ -13,9 +13,9 @@ weather_subscribers = []
 weather_messages = []
 news_subscribers = []
 news_messages = []
-associated_lists = {
-    valid_subjects[0] : weather_subscribers,
-    valid_subjects[1] : news_subscribers
+associated_subscriber_lists = {
+    valid_subjects[0]: weather_subscribers,
+    valid_subjects[1]: news_subscribers
 }
 
 
@@ -50,10 +50,35 @@ def is_valid_message(msg_items, num_items):
 def is_subscribed(subj, client):
     is_sub = False
 
-    if ((subj == valid_subjects[0]) and (client in associated_lists.get(valid_subjects[0]))) or ((subj == valid_subjects[1]) and (client in associated_lists.get(valid_subjects[1]))):
+    if ((subj == valid_subjects[0]) and (client in associated_subscriber_lists.get(valid_subjects[0]))) or ((subj == valid_subjects[1]) and (client in associated_subscriber_lists.get(valid_subjects[1]))):
         is_sub = True
 
     return is_sub
+
+
+# Add client to proper subscription list
+def add_subscriber(subject, client):
+    if subject == valid_subjects[0]:
+        l = associated_subscriber_lists.get(valid_subjects[0])
+        l.append(client)
+
+    elif subject == valid_subjects[1]:
+        l = associated_subscriber_lists.get(valid_subjects[1])
+        l.append(client)
+
+
+# Forward message to clients
+def forward_message(subject, message):
+    list_key = ''
+    if subject == valid_subjects[0]:
+        list_key = valid_subjects[0]
+
+    elif subject == valid_subjects[1]:
+        list_key = valid_subjects[1]
+
+    for subscriber in associated_subscriber_lists.get(list_key):
+        subscriber_socket = subscriber[0]
+        subscriber_socket.sendall(f"{message}".encode("utf-8"))
 
 
 # Handles each client connection
@@ -95,16 +120,28 @@ def handle_client(client_socket, client_address):
                     elif is_subscribed(subject, client_info):
                         client_socket.sendall(f"ERROR: {error_messages[3]}".encode("utf-8"))
 
+                    # Acknowledge and add new subscriber to list
                     else:
                         client_socket.sendall("SUB_ACK".encode("utf-8"))
-                        # TODO: add to list
+                        add_subscriber(subject, client_info)
                         continue
 
                 elif msg_type == 'PUB':
-                    # TODO: See below for errors to check
-                    # Is publisher subscribed to the subject they are publishing?
+                    subject = message_content[2]
+
                     # Is publisher attempting to publish to a non-existent subject?
-                    pass
+                    if subject not in valid_subjects:
+                        client_socket.sendall(f"ERROR: {error_messages[1]}".encode("utf-8"))
+                        continue
+
+                    # Is publisher subscribed to the subject they are publishing?
+                    elif not is_subscribed(subject, client_info):
+                        client_socket.sendall(f"ERROR: {error_messages[0]}".encode("utf-8"))
+
+                    # Publisher is checked, forward message
+                    else:
+                        forward_message(subject, message_content[3])
+                        continue
 
             # This case covers clients that have been subscribed, but attempted an invalid action
             elif (client_info in weather_subscribers) or (client_info in news_subscribers):
