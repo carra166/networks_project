@@ -10,12 +10,17 @@ error_messages = ['Subject Not Found',
 # Lists for checking validity
 valid_subjects = ('WEATHER', 'NEWS')
 weather_subscribers = []
-weather_messages = []
 news_subscribers = []
-news_messages = []
-associated_subscriber_lists = {
+weather_publishers = []
+news_publishers = []
+client_history = []
+subscriber_lists = {
     valid_subjects[0]: weather_subscribers,
     valid_subjects[1]: news_subscribers
+}
+publisher_lists = {
+    valid_subjects[0]: weather_publishers,
+    valid_subjects[1]: news_publishers
 }
 
 
@@ -27,14 +32,14 @@ class Client:
 
         self.conn_status = True
 
+    def get_conn_info(self):
+        return self.client_socket, self.addr
 
     def set_offline(self):
         self.conn_status = False
 
-
     def set_online(self):
         self.conn_status = True
-
 
     def get_status(self):
         return self.conn_status
@@ -43,15 +48,18 @@ class Client:
 class Subscriber(Client):
     def __init__(self, name, client_socket, addr, subject):
         super().__init__(name, client_socket, addr)
-        self.interests = [subject]
-
+        self.interests = [[subject]]
 
     def add_new_interest(self, new_subj):
-        self.interests.append(new_subj)
+        self.interests.append(list(new_subj))
 
+    def get_interests(self):
+        return [item[0] for item in self.interests]
 
     # TODO: add method to get index for publisher(s) message list
 
+    def go_offline(self):
+        pass
 
     # TODO: here
 
@@ -62,13 +70,22 @@ class Publisher(Subscriber):
         self.msg_list = [msg]
         self.msg_index = 0
 
-
     def add_message(self, new_msg):
         self.msg_list.append(new_msg)
         self.msg_index += 1
 
+    def add_new_interest(self):
+        pass
 
-    # TODO: here
+
+# Checks if a client has been connected before
+def was_connected():
+    pass
+
+
+# Convert a client to subscriber or publisher, and updates that in client history
+def convert_client():
+    pass
 
 
 # Checks client sent valid format + action
@@ -100,39 +117,21 @@ def is_valid_message(msg_items, num_items):
 
 # Checks if a client is subscribed to a subject
 def is_subscribed(subj, client):
-    is_sub = False
+    sub_l = subscriber_lists[subj]
 
-    if ((subj == valid_subjects[0]) and (client in associated_subscriber_lists.get(valid_subjects[0]))) or ((subj == valid_subjects[1]) and (client in associated_subscriber_lists.get(valid_subjects[1]))):
-        is_sub = True
-
-    return is_sub
+    return client in sub_l
 
 
+# TODO: adjust this
 # Add client to proper subscription list
 def add_subscriber(subject, client):
     if subject == valid_subjects[0]:
-        l = associated_subscriber_lists.get(valid_subjects[0])
+        l = subscriber_lists.get(valid_subjects[0])
         l.append(client)
 
     elif subject == valid_subjects[1]:
-        l = associated_subscriber_lists.get(valid_subjects[1])
+        l = subscriber_lists.get(valid_subjects[1])
         l.append(client)
-
-
-# Store message for later delivery to clients
-def store_message(subject, message):
-    list_key = ''
-    if subject == valid_subjects[0]:
-        list_key = valid_subjects[0]
-
-    elif subject == valid_subjects[1]:
-        list_key = valid_subjects[1]
-
-
-
-    # for subscriber in associated_subscriber_lists.get(list_key):
-    #     subscriber_socket = subscriber[0]
-    #     subscriber_socket.sendall(f"{message}".encode("utf-8"))
 
 
 # Handles each client connection
@@ -161,6 +160,13 @@ def handle_client(client_socket, client_address):
 
                 elif msg_type == 'CONN':
                     client_socket.sendall("CONN_ACK".encode("utf-8"))
+                    # TODO: check if is existing client
+                    # TODO: WORKING HERE
+                    if any():
+                        pass
+                    #any(x.name == "t2" for x in l)
+                    #any(x.name == "t2" for x in l)
+                    #client = Client(message_content[0], client_socket, client_address)
                     continue
 
                 elif msg_type == 'SUB':
@@ -172,8 +178,9 @@ def handle_client(client_socket, client_address):
                         continue
 
                     # Is client already subscribed?
-                    elif is_subscribed(subject, client_info):
+                    elif is_subscribed(subject, client):
                         client_socket.sendall(f"ERROR: {error_messages[3]}".encode("utf-8"))
+                        continue
 
                     # Acknowledge and add new subscriber to list
                     else:
@@ -195,7 +202,7 @@ def handle_client(client_socket, client_address):
 
                     # Publisher is checked, store message for later forwarding
                     else:
-                        store_message(subject, message_content[3])
+                        #store_message(subject, message_content[3])
                         continue
 
             # This case covers clients that have been subscribed, but attempted an invalid action
